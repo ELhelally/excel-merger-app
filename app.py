@@ -19,7 +19,7 @@ st.write("قم برفع ملف الـ ZIP الذي يحتوي على شيتات 
 uploaded_zip = st.file_uploader("اختر ملف الـ ZIP (مثل: employees.zip)", type=["zip"])
 
 # 2. تحديد اسم الملف الناتج
-output_custom_name = st.text_input("📝 اكتب اسم ملف الإكسل الناتج (بدون إضافة .xlsx):", value="كشف_حضور_وانصراف_شهر_مارس_المجمع")
+output_custom_name = st.text_input("📝 اكتب اسم ملف الإكسل الناتج (بدون إضافة .xlsx):", value="كشف_حضور_وانصراف_المجمع")
 
 def process_employee_sheet(file_path):
     try:
