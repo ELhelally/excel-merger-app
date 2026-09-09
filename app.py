@@ -13,10 +13,13 @@ st.set_page_config(page_title="دمج كشوف الحضور والانصراف",
 
 # عنوان الموقع
 st.title("📊 أداة دمج وتنسيق كشوف الحضور والانصراف")
-st.write("قم برفع ملف الـ ZIP الذي يحتوي على شيتات الموظفين للحصول على ملف إكسل مجمع ومنسق تلقائيًا.")
+st.write("قم برفع ملف الـ ZIP الذي يحتوي على شيتات الموظفين، حدد اسم الملف الناتج، ثم اضغط على زر المعالجة للحصول على ملفك المجمع والمنسق.")
 
-# رفع الملف
-uploaded_zip = st.file_uploader("اختر ملف الـ ZIP (employees.zip)", type=["zip"])
+# 1. رفع الملف
+uploaded_zip = st.file_uploader("اختر ملف الـ ZIP (مثل: employees.zip)", type=["zip"])
+
+# 2. تحديد اسم الملف الناتج
+output_custom_name = st.text_input("📝 اكتب اسم ملف الإكسل الناتج (بدون إضافة .xlsx):", value="كشف_حضور_وانصراف_شهر_مارس_المجمع")
 
 def process_employee_sheet(file_path):
     try:
@@ -103,7 +106,7 @@ def process_employee_sheet(file_path):
         return pd.DataFrame()
 
 if uploaded_zip is not None:
-    if st.button("🚀 بدء دمج الملفات ותنسيقها"):
+    if st.button("🚀 بدء دمج الملفات وتنسيقها"):
         with st.spinner("جاري فك الضغط ومعالجة الشيتات..."):
             extract_dir = "./temp_extracted"
             os.makedirs(extract_dir, exist_ok=True)
@@ -164,11 +167,17 @@ if uploaded_zip is not None:
             wb.save(output_buffer)
             output_buffer.seek(0)
             
+            # تنظيف اسم الملف وإضافة الامتداد
+            clean_filename = output_custom_name.strip()
+            if not clean_filename.endswith(".xlsx"):
+                clean_filename += ".xlsx"
+            
             st.success(f"✅ تم دمج {len(all_files)} ملف بإجمالي {len(master_df)} صف بنجاح!")
             
+            # زر التحميل بالاسم الذي حدده المستخدم
             st.download_button(
-                label="📥 تحميل ملف الإكسل المجمع المنسق",
+                label=f"📥 تحميل الملف: {clean_filename}",
                 data=output_buffer,
-                file_name="كشف_حضور_وانصراف_مجمع.xlsx",
+                file_name=clean_filename,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
