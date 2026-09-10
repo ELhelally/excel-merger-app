@@ -225,7 +225,7 @@ if uploaded_zip is not None:
             
             header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
             header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-            friday_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+            friday_fill = PatternFill(start_color="6DC95B", end_color="6DC95B", fill_type="solid")
             thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
             align_center = Alignment(horizontal='center', vertical='center')
             
