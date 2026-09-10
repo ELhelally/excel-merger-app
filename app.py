@@ -13,7 +13,7 @@ import re
 st.set_page_config(page_title="دمج كشوف الحضور والانصراف", page_icon="📊", layout="wide")
 
 st.title("📊 أداة دمج وتنسيق كشوف الحضور والانصراف")
-st.write("رفع ملف الـ ZIP وتنسيق التواريخ والأسماء بالكامل مع الترتيب التلقائي.")
+st.write("رفع ملف الـ ZIP وتنسيق الجدول والتواريخ بالكامل مع الاحتفاظ بكافة الداتا كما هي وتظليل الجمعة بالأخضر.")
 
 uploaded_zip = st.file_uploader("اختر ملف الـ ZIP (مثل: employees.zip)", type=["zip"])
 output_custom_name = st.text_input("📝 اكتب اسم ملف الإكسل الناتج:", value="كشف_حضور_وانصراف_شهر_مارس_المجمع")
@@ -25,12 +25,13 @@ DAY_MAP = {
     'الخميس': 'Thu', 'الجمعة': 'Fri', 'الجمعه': 'Fri'
 }
 
+# تحويل الوقت لنظام 24 ساعة بدون حذف
 def parse_time_24(val, is_end_time=False):
     if pd.isna(val) or val is None:
         return None
     val_str = str(val).strip()
     if not val_str or val_str in ['-', '—']:
-        return 0
+        return None
     
     has_pm = 'م' in val_str
     has_am = 'ص' in val_str
@@ -66,7 +67,6 @@ def parse_date_real_object(val, target_year=2026):
             year_num = int(parts[2]) if len(parts) >= 3 else target_year
             if year_num < 100:
                 year_num += 2000
-            # في حال كانت السنة مختلفة عن 2026 نوحدها لـ 2026 بناءً على الطلب
             year_num = target_year
             return datetime.date(year_num, month_num, day_num)
         except:
@@ -80,6 +80,7 @@ def parse_date_real_object(val, target_year=2026):
         pass
     return None
 
+# تحويل الشرطة لصفر 0
 def clean_dash_to_zero(val):
     if pd.isna(val) or val is None:
         return 0
@@ -167,10 +168,12 @@ def process_employee_sheet(file_path):
                 location = r[5] if len(r) > 5 and str(r[5]).strip() not in ['-', '—'] else None
                 supervisor = r[10] if len(r) > 10 else None
 
-                is_work_day = 1 if (process_name or process_num or (time_from and str(time_from) != '0')) else None
-                if 'إجازة' in str(process_name) or 'اجازة' in str(process_name) or day_en == 'Fri':
-                    is_work_day = None
+                # احتساب أيام العمل: 1 لو اليوم فيه عملية/ساعات عمل فعلية، وغير كده يترك فارغاً
+                has_work = bool(process_name or process_num or (time_from is not None) or (trans_val and trans_val != 0))
+                is_leave = 'إجازة' in str(process_name) or 'اجازة' in str(process_name)
+                is_work_day = 1 if (has_work and not is_leave) else None
 
+                # تنزيل كل البيانات كما هي بالضبط في الشيت دون تعديل أو حذف
                 rows_data.append({
                     'اليوم': day_en,
                     'التاريخ': date_obj,
@@ -180,11 +183,11 @@ def process_employee_sheet(file_path):
                     'رقم العملية': process_num,
                     'العملية': process_name,
                     'المكان': location,
-                    'من': time_from if is_work_day else None,
-                    'إلى': time_to if is_work_day else None,
-                    'الإنتقالات': trans_val if is_work_day else None,
-                    'بدل غذاء': food_val if is_work_day else None,
-                    'توقيع المشرف': supervisor if is_work_day else None,
+                    'من': time_from,
+                    'إلى': time_to,
+                    'الإنتقالات': trans_val,
+                    'بدل غذاء': food_val,
+                    'توقيع المشرف': supervisor,
                     'أيام العمل': is_work_day
                 })
         return pd.DataFrame(rows_data)
@@ -194,7 +197,7 @@ def process_employee_sheet(file_path):
 
 if uploaded_zip is not None:
     if st.button("🚀 دمج الملفات وتنسيق الجدول بالكامل"):
-        with st.spinner("جاري التجهيز وترتيب أرقام العمال وتنسيق التواريخ..."):
+        with st.spinner("جاري الدمج والتنسيق وحفظ كافة البيانات..."):
             extract_dir = "./temp_extracted"
             os.makedirs(extract_dir, exist_ok=True)
             
@@ -218,25 +221,22 @@ if uploaded_zip is not None:
             
             output_path = "temp_output.xlsx"
             
-            # حفظ الشيت باستخدام openpyxl مباشرة للحفاظ على نوع الخلية التاريخ
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.sheet_view.rightToLeft = True
             
             header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
             header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-            friday_fill = PatternFill(start_color="6DC95B", end_color="6DC95B", fill_type="solid")
+            friday_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid") # الأخضر الفاتح للجمعة فقط
             thin_border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
             align_center = Alignment(horizontal='center', vertical='center')
             
-            # كتابة وتنسيق الهيدر
             for col_idx, col_name in enumerate(cols_order, 1):
                 cell = ws.cell(row=1, column=col_idx, value=col_name)
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = align_center
 
-            # كتابة وتنسيق البيانات
             for r_idx, row_dict in enumerate(master_df.to_dict('records'), 2):
                 day_val = str(row_dict.get('اليوم') or '')
                 is_friday = (day_val == 'Fri' or day_val == 'الجمعة' or day_val == 'الجمعه')
@@ -247,10 +247,10 @@ if uploaded_zip is not None:
                     cell.alignment = align_center
                     cell.border = thin_border
                     
-                    # ضبط صيغة التاريخ ليعرض كمثال: 13-Feb-26 والإكسل يقرأه كتاريخ رقمي
                     if col_name == 'التاريخ' and val is not None:
                         cell.number_format = 'dd-mmm-yy'
                         
+                    # تظليل صف الجمعة بالكامل دون التعديل على أي بيانات بداخله
                     if is_friday:
                         cell.fill = friday_fill
 
@@ -267,7 +267,7 @@ if uploaded_zip is not None:
             if not clean_filename.endswith(".xlsx"):
                 clean_filename += ".xlsx"
             
-            st.success(f"✅ تم الدمج وتنسيق التواريخ والأسماء بنجاح!")
+            st.success(f"✅ تم الدمج وتطبيق التنسيق مع الحفاظ على كامل البيانات!")
             
             st.download_button(
                 label=f"📥 تحميل الملف المنسق بالكامل: {clean_filename}",
